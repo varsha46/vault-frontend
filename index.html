@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vault — Secure File Storage</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #16161f;
+      --border: rgba(255,255,255,0.07);
+      --accent: #7c6aff;
+      --accent2: #ff6a8a;
+      --accent-glow: rgba(124,106,255,0.25);
+      --text: #e8e8f0;
+      --muted: #6b6b7e;
+      --success: #4ade80;
+      --error: #ff5e7a;
+      --warning: #fbbf24;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(124,106,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,106,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(124,106,255,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 80px;
+    }
+
+    /* ── Logo / Header ── */
+    .logo-wrap {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 48px;
+      animation: fadeDown 0.6s ease both;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 24px var(--accent-glow);
+    }
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px; font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 40%, var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .logo-badge {
+      font-size: 10px; font-weight: 500; letter-spacing: 2px;
+      color: var(--muted); text-transform: uppercase; margin-top: 2px;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%; max-width: 460px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,106,255,0.06);
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1; padding: 18px;
+      background: none; border: none; cursor: pointer;
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted);
+      transition: color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .tab-btn.active {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute; bottom: -1px; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .tab-btn:hover:not(.active) { color: #aaa; }
+
+    /* ── Panels ── */
+    .panel { display: none; padding: 32px; }
+    .panel.active { display: block; animation: fadeUp 0.3s ease both; }
+
+    .panel-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px; font-weight: 700; margin-bottom: 6px;
+    }
+    .panel-sub { font-size: 12px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block; font-size: 11px; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    .field-wrap {
+      position: relative;
+    }
+    .field-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; opacity: 0.4; pointer-events: none;
+    }
+    .field input {
+      width: 100%; padding: 13px 14px 13px 40px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .field input::placeholder { color: var(--muted); }
+
+    .toggle-pw {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; color: var(--muted);
+      transition: color 0.2s;
+    }
+    .toggle-pw:hover { color: var(--text); }
+
+    /* ── Password strength ── */
+    .strength-bar { display: flex; gap: 4px; margin-top: 8px; }
+    .strength-seg {
+      flex: 1; height: 3px; border-radius: 2px;
+      background: var(--border); transition: background 0.3s;
+    }
+    .strength-label { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Button ── */
+    .btn {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--accent), #5b4de0);
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+      letter-spacing: 0.5px; color: #fff;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      position: relative; overflow: hidden;
+    }
+    .btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 8px 28px var(--accent-glow); }
+    .btn:hover:not(:disabled)::before { opacity: 1; }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.loading { pointer-events: none; }
+    .btn .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; bottom: 28px; right: 28px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 9999;
+    }
+    .toast {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px; max-width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: slideIn 0.3s ease both;
+      cursor: pointer;
+    }
+    .toast.success { border-color: rgba(74,222,128,0.3); }
+    .toast.error   { border-color: rgba(255,94,122,0.3); }
+    .toast.info    { border-color: rgba(124,106,255,0.3); }
+    .toast-icon { font-size: 16px; flex-shrink: 0; }
+    .toast-msg { line-height: 1.4; }
+    .toast.remove { animation: slideOut 0.25s ease both; }
+
+    /* ── Upload panel ── */
+    .upload-gate {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 20px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 24px;
+    }
+    .upload-gate .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--error); flex-shrink: 0;
+      box-shadow: 0 0 8px var(--error);
+    }
+    .upload-gate.authenticated .status-dot {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    .upload-gate .gate-text { font-size: 12px; color: var(--muted); }
+    .upload-gate .gate-user { font-size: 12px; color: var(--text); font-weight: 500; }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 14px; padding: 40px 20px;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative; overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(124,106,255,0.04);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-icon { font-size: 36px; margin-bottom: 12px; }
+    .drop-title {
+      font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; margin-bottom: 6px;
+    }
+    .drop-sub { font-size: 11px; color: var(--muted); }
+
+    .file-preview {
+      display: none;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 20px;
+      align-items: center; gap: 14px;
+    }
+    .file-preview.visible { display: flex; }
+    .file-type-icon { font-size: 28px; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name {
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-size { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .file-remove {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 16px;
+      transition: color 0.2s;
+    }
+    .file-remove:hover { color: var(--error); }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      display: none; margin-bottom: 20px;
+    }
+    .progress-wrap.visible { display: block; }
+    .progress-label {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--muted); margin-bottom: 6px;
+    }
+    .progress-track {
+      height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px; transition: width 0.15s ease;
+    }
+
+    /* ── Uploaded files list ── */
+    .files-section { margin-top: 32px; }
+    .files-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+    }
+    .files-heading {
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+    }
+    .files-count {
+      font-size: 11px; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2px 10px;
+    }
+    .file-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 8px;
+      animation: fadeUp 0.3s ease both;
+    }
+    .file-item-icon { font-size: 20px; flex-shrink: 0; }
+    .file-item-info { flex: 1; min-width: 0; }
+    .file-item-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-item-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .file-item-status {
+      font-size: 10px; padding: 3px 8px; border-radius: 20px;
+      background: rgba(74,222,128,0.1); color: var(--success);
+      border: 1px solid rgba(74,222,128,0.2);
+      flex-shrink: 0;
+    }
+
+    /* ── Switch link ── */
+    .switch-text {
+      text-align: center; margin-top: 24px;
+      font-size: 12px; color: var(--muted);
+    }
+    .switch-link {
+      color: var(--accent); cursor: pointer; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .switch-link:hover { color: #a89bff; }
+
+    /* ── Animations ── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideOut {
+      to   { opacity: 0; transform: translateX(20px); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app">
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-icon">🔒</div>
+    <div>
+      <div class="logo-text">Vault</div>
+      <div class="logo-badge">Secure File Storage</div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="card" style="animation: fadeUp 0.5s ease 0.1s both;">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+      <button class="tab-btn" id="tab-login" onclick="switchTab('login')">Login</button>
+      <button class="tab-btn" id="tab-upload" onclick="switchTab('upload')">Upload</button>
+    </div>
+
+    <!-- SIGNUP -->
+    <div class="panel active" id="panel-signup">
+      <div class="panel-title">Create account</div>
+      <div class="panel-sub">Join Vault to securely store and manage your files.</div>
+
+      <div class="field">
+        <label>Email address</label>
+        <div class="field-wrap">
+          <span class="field-icon">✉️</span>
+          <input type="email" id="signup_email" placeholder="you@example.com" autocomplete="email"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="field-wrap">
+          <span class="field-icon">🔑</span>
+          <input type="password" id="signup_password" placeholder="Min. 8 characters"
+                 oninput="checkStrength(this.value)" autocomplete="new-password"/>
+          <button type="button" class="toggle-pw" onclick="togglePw('signup_password', this)">👁</button>
+        </div>
+        <div class="strength-bar">
+          <div class="strength-seg" id="s1"></div>
+          <div class="strength-seg" id="s2"></div>
+          <div class="strength-seg" id="s3"></div>
+          <div class="strength-seg" id="s4"></div>
+        </div>
+        <div class="strength-label" id="strength-label">Enter a password</div>
+      </div>
+
+      <div class="field">
+        <label>Confirm password</label>
+        <div class="field-wrap">
+          <span class="field-icon">🔒</span>
+          <input type="password" id="signup_confirm" placeholder="Repeat your password" autocomplete="new-password"/>
+          <button type="button" class="toggle-pw" onclick="togglePw('signup_confirm', this)">👁</button>
+        </div>
+      </div>
+
+      <button class="btn" onclick="signup()" id="btn-signup">Create Account</button>
+      <div class="switch-text">Already have an account? <span class="switch-link" onclick="switchTab('login')">Login →</span></div>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="panel" id="panel-login">
+      <div class="panel-title">Welcome back</div>
+      <div class="panel-sub">Sign in to access your secure file vault.</div>
+
+      <div class="field">
+        <label>Email address</label>
+        <div class="field-wrap">
+          <span class="field-icon">✉️</span>
+          <input type="email" id="login_email" placeholder="you@example.com" autocomplete="email"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="field-wrap">
+          <span class="field-icon">🔑</span>
+          <input type="password" id="login_password" placeholder="Your password" autocomplete="current-password"/>
+          <button type="button" class="toggle-pw" onclick="togglePw('login_password', this)">👁</button>
+        </div>
+      </div>
+
+      <button class="btn" onclick="login()" id="btn-login">Sign In</button>
+      <div class="switch-text">Don't have an account? <span class="switch-link" onclick="switchTab('signup')">Sign up →</span></div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div class="panel" id="panel-upload">
+      <div class="panel-title">Upload files</div>
+      <div class="panel-sub">Drag & drop or browse to upload. Max 50 MB per file.</div>
+
+      <!-- Auth status -->
+      <div class="upload-gate" id="upload-gate">
+        <div class="status-dot" id="auth-dot"></div>
+        <div>
+          <div class="gate-text" id="gate-text">Not authenticated — please login first</div>
+          <div class="gate-user" id="gate-user" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="drop-zone"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <input type="file" id="file-input" onchange="onFileSelect(event)"/>
+        <div class="drop-icon">📂</div>
+        <div class="drop-title">Drop your file here</div>
+        <div class="drop-sub">or click to browse — any file type accepted</div>
+      </div>
+
+      <!-- File preview -->
+      <div class="file-preview" id="file-preview">
+        <div class="file-type-icon" id="preview-icon">📄</div>
+        <div class="file-info">
+          <div class="file-name" id="preview-name">filename.pdf</div>
+          <div class="file-size" id="preview-size">0 KB</div>
+        </div>
+        <button class="file-remove" onclick="clearFile()" title="Remove">✕</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label">
+          <span id="progress-text">Uploading…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <button class="btn" onclick="upload()" id="btn-upload">Upload File</button>
+
+      <!-- Uploaded list -->
+      <div class="files-section" id="files-section" style="display:none">
+        <div class="files-header">
+          <span class="files-heading">Uploaded Files</span>
+          <span class="files-count" id="files-count">0 files</span>
+        </div>
+        <div id="files-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const API = "https://www.phulvar.online";
+  let token = null;
+  let currentUser = null;
+  let selectedFile = null;
+  let uploadedFiles = [];
+
+  // ─── Tab switching ───────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+    refreshUploadGate();
+  }
+
+  // ─── Toast ───────────────────────────────────────────────────────
+  function toast(msg, type = 'info') {
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span class="toast-icon">${icons[type]}</span><span class="toast-msg">${msg}</span>`;
+    el.onclick = () => el.remove();
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => {
+      el.classList.add('remove');
+      setTimeout(() => el.remove(), 300);
+    }, 4000);
+  }
+
+  // ─── Password visibility toggle ──────────────────────────────────
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+    else                         { inp.type = 'password'; btn.textContent = '👁'; }
+  }
+
+  // ─── Password strength ───────────────────────────────────────────
+  function checkStrength(val) {
+    let score = 0;
+    if (val.length >= 8)  score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const colors = ['', '#ff5e7a', '#fbbf24', '#60a5fa', '#4ade80'];
+    const labels = ['Enter a password', 'Weak', 'Fair', 'Good', 'Strong 💪'];
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('s' + i).style.background = i <= score ? colors[score] : 'var(--border)';
+    }
+    document.getElementById('strength-label').textContent = labels[score];
+    document.getElementById('strength-label').style.color = colors[score] || 'var(--muted)';
+  }
+
+  // ─── Loading state helper ─────────────────────────────────────────
+  function setLoading(btnId, loading, label) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? `<span class="spinner"></span>${label}`
+      : label;
+  }
+
+  // ─── SIGNUP ───────────────────────────────────────────────────────
+  async function signup() {
+    const email    = document.getElementById('signup_email').value.trim();
+    const password = document.getElementById('signup_password').value;
+    const confirm  = document.getElementById('signup_confirm').value;
+
+    if (!email || !password) { toast('Please fill in all fields.', 'warning'); return; }
+    if (!/\S+@\S+\.\S+/.test(email)) { toast('Invalid email address.', 'warning'); return; }
+    if (password.length < 8) { toast('Password must be at least 8 characters.', 'warning'); return; }
+    if (password !== confirm) { toast('Passwords do not match.', 'error'); return; }
+
+    setLoading('btn-signup', true, 'Creating account…');
+    try {
+      const res  = await fetch(`${API}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const text = await res.text();
+console.log("RAW RESPONSE:", text);
+
+let data;
+try {
+  data = JSON.parse(text);
+} catch (e) {
+  console.error("Invalid JSON:", text);
+  toast("Server error: invalid response", "error");
+  return;
+}
+      if (res.ok) {
+        toast(data.message || 'Account created successfully!', 'success');
+        setTimeout(() => switchTab('login'), 800);
+      } else {
+        toast(data.message || 'Signup failed. Try again.', 'error');
+      }
+    } catch (e) {
+      toast('Network error. Please try again.', 'error');
+    } finally {
+      setLoading('btn-signup', false, 'Create Account');
+    }
+  }
+
+  // ─── LOGIN ────────────────────────────────────────────────────────
+  async function login() {
+    const email    = document.getElementById('login_email').value.trim();
+    const password = document.getElementById('login_password').value;
+
+    if (!email || !password) { toast('Please fill in all fields.', 'warning'); return; }
+
+    setLoading('btn-login', true, 'Signing in…');
+    try {
+      const res  = await fetch(`${API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        token = data.token;
+        currentUser = email;
+        toast('Welcome back, ' + email.split('@')[0] + '! 👋', 'success');
+        refreshUploadGate();
+        setTimeout(() => switchTab('upload'), 800);
+      } else {
+        toast(data.message || 'Invalid credentials.', 'error');
+      }
+    } catch (e) {
+      toast('Network error. Please try again.', 'error');
+    } finally {
+      setLoading('btn-login', false, 'Sign In');
+    }
+  }
+
+  // ─── Upload gate display ──────────────────────────────────────────
+  function refreshUploadGate() {
+    const gate = document.getElementById('upload-gate');
+    const dot  = document.getElementById('auth-dot');
+    const txt  = document.getElementById('gate-text');
+    const user = document.getElementById('gate-user');
+    if (token) {
+      gate.classList.add('authenticated');
+      txt.textContent  = 'Authenticated';
+      user.textContent = currentUser;
+      user.style.display = 'block';
+    } else {
+      gate.classList.remove('authenticated');
+      txt.textContent  = 'Not authenticated — please login first';
+      user.style.display = 'none';
+    }
+  }
+
+  // ─── Drag & Drop ──────────────────────────────────────────────────
+  function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.add('drag-over');
+  }
+  function onDragLeave() {
+    document.getElementById('drop-zone').classList.remove('drag-over');
+  }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  }
+  function onFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) setFile(file);
+  }
+
+  function getFileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const map = {
+      pdf: '📕', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊',
+      ppt: '📋', pptx: '📋', jpg: '🖼️', jpeg: '🖼️', png: '🖼️',
+      gif: '🎞️', mp4: '🎬', mp3: '🎵', zip: '🗜️', rar: '🗜️',
+      txt: '📃', js: '💻', py: '🐍', html: '🌐', css: '🎨',
+    };
+    return map[ext] || '📄';
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function setFile(file) {
+    if (file.size > 50 * 1024 * 1024) { toast('File too large. Max 50 MB.', 'error'); return; }
+    selectedFile = file;
+    document.getElementById('preview-icon').textContent = getFileIcon(file.name);
+    document.getElementById('preview-name').textContent = file.name;
+    document.getElementById('preview-size').textContent = formatSize(file.size);
+    document.getElementById('file-preview').classList.add('visible');
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-preview').classList.remove('visible');
+  }
+
+  // ─── UPLOAD ───────────────────────────────────────────────────────
+  async function upload() {
+    if (!token) { toast('Please login first.', 'warning'); return; }
+    if (!selectedFile) { toast('Please select a file.', 'warning'); return; }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    // Show progress
+    const prog = document.getElementById('progress-wrap');
+    const fill = document.getElementById('progress-fill');
+    const pct  = document.getElementById('progress-pct');
+    const ptxt = document.getElementById('progress-text');
+    prog.classList.add('visible');
+    fill.style.width = '0%';
+
+    setLoading('btn-upload', true, 'Uploading…');
+
+    // Simulate progress with XHR for real progress events
+    try {
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API}/upload`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const p = Math.round((e.loaded / e.total) * 100);
+            fill.style.width = p + '%';
+            pct.textContent  = p + '%';
+            ptxt.textContent = p < 100 ? 'Uploading…' : 'Processing…';
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+            else reject(new Error(data.message || 'Upload failed'));
+          } catch { reject(new Error('Invalid server response')); }
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
+      });
+
+      // Success
+      fill.style.width = '100%';
+      toast('File uploaded successfully! 🎉', 'success');
+      addUploadedFile(selectedFile);
+      setTimeout(() => {
+        prog.classList.remove('visible');
+        clearFile();
+      }, 1200);
+
+    } catch (err) {
+      toast(err.message || 'Upload failed.', 'error');
+      prog.classList.remove('visible');
+    } finally {
+      setLoading('btn-upload', false, 'Upload File');
+    }
+  }
+
+  function addUploadedFile(file) {
+    uploadedFiles.push({ name: file.name, size: file.size, date: new Date() });
+    const section = document.getElementById('files-section');
+    const list    = document.getElementById('files-list');
+    const count   = document.getElementById('files-count');
+    section.style.display = 'block';
+    count.textContent = uploadedFiles.length + ' file' + (uploadedFiles.length > 1 ? 's' : '');
+
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `
+      <div class="file-item-icon">${getFileIcon(file.name)}</div>
+      <div class="file-item-info">
+        <div class="file-item-name">${file.name}</div>
+        <div class="file-item-meta">${formatSize(file.size)} · Just now</div>
+      </div>
+      <div class="file-item-status">Uploaded</div>
+    `;
+    list.prepend(item);
+  }
+
+  // ─── Enter key support ────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const active = document.querySelector('.panel.active');
+    if (!active) return;
+    if (active.id === 'panel-signup') signup();
+    else if (active.id === 'panel-login') login();
+    else if (active.id === 'panel-upload') upload();
+  });
+
+  // Init
+  refreshUploadGate();
+</script>
+</body>
