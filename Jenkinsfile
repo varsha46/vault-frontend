@@ -22,16 +22,17 @@ pipeline {
         }
 
         stage('Reload Nginx') {
-    steps {
-        sh '''
-            ssh -i /var/lib/jenkins/task-key.pem \
-                -o StrictHostKeyChecking=no \
-                -o ProxyCommand="ssh -i /var/lib/jenkins/task-key.pem -o StrictHostKeyChecking=no -W %h:%p ec2-user@13.201.54.222" \
-                ec2-user@10.0.1.68 \
-                "sudo systemctl restart nginx"
-        '''
+            steps {
+                sh '''
+                    ssh -i /var/lib/jenkins/task-key.pem \
+                        -o StrictHostKeyChecking=no \
+                        -o ProxyCommand="ssh -i /var/lib/jenkins/task-key.pem -o StrictHostKeyChecking=no -W %h:%p ec2-user@13.201.54.222" \
+                        ec2-user@10.0.1.68 \
+                        "sudo systemctl restart nginx"
+                '''
+            }
+        }
     }
-}
 
     post {
         success {
